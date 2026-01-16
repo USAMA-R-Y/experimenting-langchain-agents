@@ -18,7 +18,18 @@ from utils.helpers import extract_text_from_message
 
 load_dotenv()
 
-app = FastAPI()
+# Validate API key
+if not os.getenv("GOOGLE_API_KEY"):
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set in the environment. "
+        "Please create a .env file with GOOGLE_API_KEY=your_key_here"
+    )
+
+app = FastAPI(
+    title="Multi-Agent System - Synchronous",
+    version="1.0.0",
+    description="Hierarchical multi-agent system with specialized agents for math, weather, and research"
+)
 
 
 # ==================== AGENTS ====================
@@ -35,8 +46,7 @@ math_tools = [calculator, advanced_calculator, analyze_data, filter_data]
 math_agent = create_agent(
     create_llm(),
     math_tools,
-    system_prompt=SystemMessage(
-        "You are a math expert. Use your tools to solve mathematical problems and analyze numerical data.")
+    system_prompt=SystemMessage(content="You are a math expert. Use your tools to solve mathematical problems and analyze numerical data.")
 )
 
 
@@ -51,7 +61,7 @@ weather_tools = [get_weather, get_forecast]
 weather_agent = create_agent(
     create_llm(),
     tools=weather_tools,
-    system_prompt=SystemMessage("You are a weather specialist. Provide detailed weather information and forecasts.")
+    system_prompt=SystemMessage(content="You are a weather specialist. Provide detailed weather information and forecasts.")
 )
 
 
@@ -66,7 +76,7 @@ research_tools = [search_database, text_analyzer]
 research_agent = create_agent(
     create_llm(),
     tools=research_tools,
-    system_prompt=SystemMessage("You are a research assistant. Search databases and analyze text to answer questions.")
+    system_prompt=SystemMessage(content="You are a research assistant. Search databases and analyze text to answer questions.")
 )
 
 
@@ -81,8 +91,9 @@ all_tools = [call_math_agent, call_weather_agent, call_research_agent]
 general_agent = create_agent(
     create_llm(),
     tools=all_tools,
-    system_prompt=SystemMessage(
-        "You are a general assistant with access to multiple tools. Choose the right tools for the task.")
+    system_prompt=SystemMessage(content="You are a general assistant with access to multiple specialized agents. "
+                                         "Choose the right agent tool for the task: math_tool for calculations, "
+                                         "weather_tool for weather information, research_tool for database searches and text analysis.")
 )
 
 
@@ -120,7 +131,7 @@ def health():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "lg-multi-agent:app",
+        "lg-multi-agent-sync:app",
         host="0.0.0.0",
         port=8001,
         reload=True,

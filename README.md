@@ -145,7 +145,7 @@ curl -X POST http://localhost:8001/agent \
 
 **Run:**
 ```bash
-python lg-multi-agent.py
+python lg-multi-agent-sync.py
 # Server runs at http://0.0.0.0:8001
 ```
 

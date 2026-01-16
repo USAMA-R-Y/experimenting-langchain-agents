@@ -13,10 +13,22 @@ from langchain.messages import SystemMessage, HumanMessage
 
 # components
 from utils.tools import get_weather, calculator
+from utils.helpers import extract_text_from_message
 
 load_dotenv()
 
-app = FastAPI()
+# Validate API key
+if not os.getenv("GOOGLE_API_KEY"):
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set in the environment. "
+        "Please create a .env file with GOOGLE_API_KEY=your_key_here"
+    )
+
+app = FastAPI(
+    title="LangChain Agent - Single Agent",
+    version="1.0.0",
+    description="Simple LangChain agent with calculator and weather tools"
+)
 
 # Initialize LLM
 model = ChatGoogleGenerativeAI(
@@ -29,10 +41,9 @@ model = ChatGoogleGenerativeAI(
 agent_executor = create_agent(
     model,
     tools=[calculator, get_weather],
-    system_prompt=SystemMessage("""
-    You are a helpful assistant with access to tools. Use them when needed.
-    Don't go beyond the scope of available tools.
-    """)
+    system_prompt=SystemMessage(content="You are a helpful assistant with access to tools. "
+                                         "Use the calculator for math operations and get_weather for weather information. "
+                                         "Don't go beyond the scope of available tools.")
 )
 
 
@@ -52,7 +63,7 @@ def agent_endpoint(request: QueryRequest):
         state = agent_executor.invoke({"messages": [{"role": "user", "content": request.query}]})
 
         messages = state.get("messages", [])
-        answer = messages[-1].content if messages else ""
+        answer = extract_text_from_message(messages[-1]) if messages else ""
 
         return AgentResponse(answer=answer, intermediate_steps=None)
     except Exception as e:
@@ -68,5 +79,6 @@ if __name__ == "__main__":
     uvicorn.run(
         "lg-agent:app",
         host="0.0.0.0",
-        port=8001
+        port=8001,
+        reload=True
     )

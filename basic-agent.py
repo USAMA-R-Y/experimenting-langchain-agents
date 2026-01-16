@@ -6,15 +6,24 @@ import google.generativeai as genai
 import os
 from typing import Optional
 
+from utils.helpers import extract_function_call_from_response, extract_text_from_response
+
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
-    raise RuntimeError("GOOGLE_API_KEY is not set in the environment")
+    raise RuntimeError(
+        "GOOGLE_API_KEY is not set in the environment. "
+        "Please create a .env file with GOOGLE_API_KEY=your_key_here"
+    )
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-app = FastAPI()
+app = FastAPI(
+    title="Basic Agent - Native Gemini SDK",
+    version="1.0.0",
+    description="Simple agent using native Google Gemini SDK with function calling"
+)
 
 # Tool definitions
 TOOLS = [
@@ -107,6 +116,9 @@ def agent_endpoint(request: QueryRequest):
     model = genai.GenerativeModel(
         model_name="gemini-2.5-flash",
         tools=[{"function_declarations": FUNCTION_DECLARATIONS}],
+        system_instruction="You are a helpful assistant with access to tools. "
+                          "Use the calculator for math operations and get_weather for weather queries. "
+                          "Always provide clear and concise responses."
     )
 
     chat = model.start_chat(history=[])
@@ -117,29 +129,7 @@ def agent_endpoint(request: QueryRequest):
     tool_used: Optional[str] = None
     tool_result: Optional[dict] = None
 
-    def extract_function_call(response):
-        return next(
-            (
-                part.function_call
-                for candidate in response.candidates or []
-                for part in (candidate.content.parts if candidate.content else [])
-                if getattr(part, "function_call", None)
-            ),
-            None,
-        )
-
-    def extract_text(response):
-        return next(
-            (
-                part.text
-                for candidate in response.candidates or []
-                for part in (candidate.content.parts if candidate.content else [])
-                if getattr(part, "text", None)
-            ),
-            None,
-        )
-
-    function_call = extract_function_call(initial_response)
+    function_call = extract_function_call_from_response(initial_response)
 
     if function_call:
         tool_name = function_call.name
@@ -165,10 +155,10 @@ def agent_endpoint(request: QueryRequest):
             }
         )
 
-        answer = extract_text(follow_up) or "No response generated"
+        answer = extract_text_from_response(follow_up) or "No response generated"
     else:
         # No tool needed, direct answer
-        answer = extract_text(initial_response) or "No response generated"
+        answer = extract_text_from_response(initial_response) or "No response generated"
 
     return AgentResponse(
         answer=answer,

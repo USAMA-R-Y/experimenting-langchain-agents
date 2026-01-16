@@ -154,3 +154,470 @@ def search_database(query: str) -> dict:
         return {"results": database["products"]}
     else:
         return {"results": []}
+
+
+# ==================== SUPPORT TICKET TOOLS ====================
+
+# Sentiment Analysis Tools
+@tool
+def analyze_sentiment(message: str) -> dict:
+    """Analyzes sentiment of customer message
+
+    Args:
+        message: Customer message text
+    """
+    # Mock sentiment analysis based on keywords
+    negative_keywords = ["angry", "frustrated", "terrible", "worst", "horrible", "broken", "useless"]
+    positive_keywords = ["great", "excellent", "thanks", "happy", "love", "perfect", "amazing"]
+    
+    message_lower = message.lower()
+    negative_count = sum(1 for word in negative_keywords if word in message_lower)
+    positive_count = sum(1 for word in positive_keywords if word in message_lower)
+    
+    if negative_count > positive_count:
+        sentiment = "negative"
+        score = -0.7
+    elif positive_count > negative_count:
+        sentiment = "positive"
+        score = 0.8
+    else:
+        sentiment = "neutral"
+        score = 0.0
+    
+    return {
+        "sentiment": sentiment,
+        "score": score,
+        "confidence": 0.85
+    }
+
+
+@tool
+def detect_urgency(message: str) -> dict:
+    """Detects urgency level of support ticket
+
+    Args:
+        message: Customer message text
+    """
+    urgent_keywords = ["urgent", "asap", "immediately", "emergency", "critical", "now", "broken"]
+    message_lower = message.lower()
+    
+    urgent_count = sum(1 for word in urgent_keywords if word in message_lower)
+    
+    if urgent_count >= 2:
+        level = "critical"
+        priority = 1
+    elif urgent_count == 1:
+        level = "high"
+        priority = 2
+    else:
+        level = "normal"
+        priority = 3
+    
+    return {
+        "urgency_level": level,
+        "priority": priority,
+        "requires_escalation": level == "critical"
+    }
+
+
+@tool
+def classify_emotion(message: str) -> dict:
+    """Classifies primary emotion in customer message
+
+    Args:
+        message: Customer message text
+    """
+    emotion_patterns = {
+        "anger": ["angry", "furious", "mad", "outraged"],
+        "frustration": ["frustrated", "annoyed", "irritated"],
+        "sadness": ["disappointed", "sad", "unhappy"],
+        "fear": ["worried", "concerned", "afraid"],
+        "joy": ["happy", "excited", "thrilled", "delighted"]
+    }
+    
+    message_lower = message.lower()
+    emotion_scores = {}
+    
+    for emotion, keywords in emotion_patterns.items():
+        score = sum(1 for word in keywords if word in message_lower)
+        if score > 0:
+            emotion_scores[emotion] = score
+    
+    if emotion_scores:
+        primary_emotion = max(emotion_scores, key=emotion_scores.get)
+        intensity = min(emotion_scores[primary_emotion] * 0.3, 1.0)
+    else:
+        primary_emotion = "neutral"
+        intensity = 0.0
+    
+    return {
+        "primary_emotion": primary_emotion,
+        "intensity": intensity,
+        "all_emotions": emotion_scores
+    }
+
+
+# Knowledge Base Tools
+@tool
+def search_docs(query: str) -> dict:
+    """Searches documentation and help articles
+
+    Args:
+        query: Search query
+    """
+    # Mock knowledge base
+    docs = {
+        "login": {
+            "title": "Login Issues",
+            "summary": "Reset password via email or contact support",
+            "url": "/docs/login-help",
+            "relevance": 0.95
+        },
+        "payment": {
+            "title": "Payment Problems",
+            "summary": "Check card details, billing address, or try another payment method",
+            "url": "/docs/payment-issues",
+            "relevance": 0.90
+        },
+        "bug": {
+            "title": "Report a Bug",
+            "summary": "Submit bug report with screenshots and steps to reproduce",
+            "url": "/docs/bug-report",
+            "relevance": 0.85
+        }
+    }
+    
+    query_lower = query.lower()
+    results = []
+    
+    for key, doc in docs.items():
+        if key in query_lower or any(word in query_lower for word in doc["title"].lower().split()):
+            results.append(doc)
+    
+    return {
+        "results": results[:3] if results else [docs["bug"]],
+        "total_found": len(results)
+    }
+
+
+@tool
+def find_similar_tickets(description: str) -> dict:
+    """Finds similar past support tickets
+
+    Args:
+        description: Ticket description
+    """
+    # Mock similar tickets database
+    similar_tickets = [
+        {
+            "id": "T-1234",
+            "issue": "Cannot login after password reset",
+            "resolution": "Cleared browser cache and cookies",
+            "resolved_time": "2 hours",
+            "similarity": 0.87
+        },
+        {
+            "id": "T-5678",
+            "issue": "Payment declined with valid card",
+            "resolution": "Updated billing address to match card",
+            "resolved_time": "1 hour",
+            "similarity": 0.72
+        }
+    ]
+    
+    # Mock matching logic
+    if "login" in description.lower() or "password" in description.lower():
+        return {"similar_tickets": [similar_tickets[0]], "count": 1}
+    elif "payment" in description.lower():
+        return {"similar_tickets": [similar_tickets[1]], "count": 1}
+    else:
+        return {"similar_tickets": similar_tickets[:1], "count": 1}
+
+
+@tool
+def get_solution_steps(issue_type: str) -> dict:
+    """Gets step-by-step solution for common issues
+
+    Args:
+        issue_type: Type of issue (login, payment, bug, etc.)
+    """
+    solutions = {
+        "login": {
+            "steps": [
+                "Clear browser cache and cookies",
+                "Try incognito/private mode",
+                "Reset password via email link",
+                "Check for browser extensions blocking scripts"
+            ],
+            "estimated_time": "5-10 minutes",
+            "success_rate": 0.92
+        },
+        "payment": {
+            "steps": [
+                "Verify card details are correct",
+                "Check billing address matches card",
+                "Try a different payment method",
+                "Contact your bank for authorization"
+            ],
+            "estimated_time": "10-15 minutes",
+            "success_rate": 0.88
+        },
+        "default": {
+            "steps": [
+                "Restart the application",
+                "Check internet connection",
+                "Update to latest version",
+                "Contact support with error details"
+            ],
+            "estimated_time": "10 minutes",
+            "success_rate": 0.75
+        }
+    }
+    
+    return solutions.get(issue_type.lower(), solutions["default"])
+
+
+# Customer Context Tools
+@tool
+def get_customer_profile(customer_id: str) -> dict:
+    """Retrieves customer profile information
+
+    Args:
+        customer_id: Customer ID
+    """
+    # Mock customer profiles
+    profiles = {
+        "C001": {
+            "name": "John Doe",
+            "email": "john@example.com",
+            "account_type": "Premium",
+            "member_since": "2023-01-15",
+            "total_tickets": 3,
+            "satisfaction_score": 4.5
+        },
+        "C002": {
+            "name": "Jane Smith",
+            "email": "jane@example.com",
+            "account_type": "Basic",
+            "member_since": "2024-06-20",
+            "total_tickets": 1,
+            "satisfaction_score": 5.0
+        }
+    }
+    
+    return profiles.get(customer_id, {
+        "name": "Unknown Customer",
+        "email": "unknown@example.com",
+        "account_type": "Basic",
+        "member_since": "2024-01-01",
+        "total_tickets": 0,
+        "satisfaction_score": 0.0
+    })
+
+
+@tool
+def fetch_purchase_history(customer_id: str) -> dict:
+    """Fetches customer's purchase history
+
+    Args:
+        customer_id: Customer ID
+    """
+    # Mock purchase history
+    history = {
+        "C001": {
+            "total_purchases": 5,
+            "total_spent": 249.95,
+            "last_purchase": "2024-12-15",
+            "products": ["Premium Plan", "Add-on Pack", "Storage Upgrade"]
+        },
+        "C002": {
+            "total_purchases": 1,
+            "total_spent": 9.99,
+            "last_purchase": "2024-11-20",
+            "products": ["Basic Plan"]
+        }
+    }
+    
+    return history.get(customer_id, {
+        "total_purchases": 0,
+        "total_spent": 0.0,
+        "last_purchase": None,
+        "products": []
+    })
+
+
+@tool
+def check_subscription_status(customer_id: str) -> dict:
+    """Checks customer's subscription status
+
+    Args:
+        customer_id: Customer ID
+    """
+    # Mock subscription data
+    subscriptions = {
+        "C001": {
+            "plan": "Premium",
+            "status": "active",
+            "renewal_date": "2025-02-15",
+            "payment_method": "Credit Card ***1234",
+            "auto_renew": True
+        },
+        "C002": {
+            "plan": "Basic",
+            "status": "active",
+            "renewal_date": "2025-01-20",
+            "payment_method": "PayPal",
+            "auto_renew": True
+        }
+    }
+    
+    return subscriptions.get(customer_id, {
+        "plan": "None",
+        "status": "inactive",
+        "renewal_date": None,
+        "payment_method": None,
+        "auto_renew": False
+    })
+
+
+# Product/Service Status Tools
+@tool
+def check_service_status() -> dict:
+    """Checks current status of all services"""
+    return {
+        "overall_status": "operational",
+        "services": {
+            "api": {"status": "operational", "uptime": 99.9},
+            "web_app": {"status": "operational", "uptime": 99.8},
+            "database": {"status": "operational", "uptime": 99.95},
+            "payment_gateway": {"status": "operational", "uptime": 99.7}
+        },
+        "last_incident": "2024-12-10",
+        "next_maintenance": "2025-01-20"
+    }
+
+
+@tool
+def get_known_issues() -> dict:
+    """Retrieves list of known issues"""
+    return {
+        "issues": [
+            {
+                "id": "I-101",
+                "title": "Slow dashboard loading on mobile",
+                "severity": "low",
+                "status": "investigating",
+                "affected_users": "~5%",
+                "reported": "2025-01-14"
+            },
+            {
+                "id": "I-102",
+                "title": "Email notifications delayed",
+                "severity": "medium",
+                "status": "fix_in_progress",
+                "affected_users": "~2%",
+                "reported": "2025-01-15",
+                "eta": "2025-01-17"
+            }
+        ],
+        "total_issues": 2
+    }
+
+
+@tool
+def check_outages() -> dict:
+    """Checks for any current service outages"""
+    return {
+        "active_outages": [],
+        "recent_outages": [
+            {
+                "service": "API",
+                "duration": "15 minutes",
+                "occurred": "2025-01-10 14:30 UTC",
+                "resolved": "2025-01-10 14:45 UTC",
+                "impact": "API requests failed for some users"
+            }
+        ],
+        "total_active": 0,
+        "all_systems_operational": True
+    }
+
+
+# Response Generation Tools
+@tool
+def generate_response(context: str) -> dict:
+    """Generates appropriate response based on context
+
+    Args:
+        context: Aggregated context from other agents
+    """
+    # This would typically use an LLM, but we'll return a template
+    return {
+        "response_template": "Thank you for contacting support. Based on your issue, here are the recommended steps...",
+        "tone": "professional and empathetic",
+        "estimated_resolution_time": "within 24 hours"
+    }
+
+
+@tool
+def apply_tone_guidelines(message: str, sentiment: str) -> dict:
+    """Applies appropriate tone based on customer sentiment
+
+    Args:
+        message: Draft response message
+        sentiment: Customer sentiment (positive, negative, neutral)
+    """
+    tone_adjustments = {
+        "negative": {
+            "tone": "empathetic and apologetic",
+            "opening": "We sincerely apologize for the inconvenience.",
+            "closing": "We're committed to resolving this as quickly as possible."
+        },
+        "positive": {
+            "tone": "friendly and appreciative",
+            "opening": "Thank you for reaching out!",
+            "closing": "We're here if you need anything else!"
+        },
+        "neutral": {
+            "tone": "professional and helpful",
+            "opening": "Thank you for contacting us.",
+            "closing": "Please let us know if you have any questions."
+        }
+    }
+    
+    adjustment = tone_adjustments.get(sentiment, tone_adjustments["neutral"])
+    
+    return {
+        "adjusted_message": f"{adjustment['opening']} {message} {adjustment['closing']}",
+        "tone_applied": adjustment["tone"]
+    }
+
+
+@tool
+def suggest_next_steps(issue_type: str, resolution_status: str) -> dict:
+    """Suggests next steps for customer or support team
+
+    Args:
+        issue_type: Type of issue
+        resolution_status: Current resolution status
+    """
+    next_steps = {
+        "resolved": {
+            "customer": ["Mark ticket as resolved", "Provide feedback"],
+            "support": ["Follow up in 48 hours", "Close ticket"]
+        },
+        "pending": {
+            "customer": ["Try suggested solutions", "Provide additional information"],
+            "support": ["Monitor progress", "Escalate if not resolved in 24h"]
+        },
+        "escalated": {
+            "customer": ["Wait for specialist contact", "Check email for updates"],
+            "support": ["Assign to specialist", "Set priority to high"]
+        }
+    }
+    
+    return {
+        "next_steps": next_steps.get(resolution_status, next_steps["pending"]),
+        "follow_up_required": resolution_status != "resolved",
+        "estimated_timeline": "24-48 hours"
+    }
