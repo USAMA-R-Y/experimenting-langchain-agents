@@ -2,6 +2,7 @@ import os
 from typing import Optional, List, Literal
 
 # libs
+from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -111,9 +112,10 @@ class AgentResponse(BaseModel):
 def agent_endpoint(request: QueryRequest):
     try:
         # Invoke agent with LangChain 0.3 API
-        state = general_agent.invoke({
-            "messages": [{"role": "user", "content": request.query}]
-        })
+        state = general_agent.invoke(
+            {"messages": [{"role": "user", "content": request.query}]},
+            {"configurable": {"thread_id": str(uuid4())}},
+        )
 
         # Extract answer from the last message
         messages = state.get("messages", [])

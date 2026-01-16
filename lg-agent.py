@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 from typing import Optional
 import uvicorn
 from dotenv import load_dotenv
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.agents import create_agent
 from langchain.messages import SystemMessage, HumanMessage
+from langgraph.checkpoint.memory import InMemorySaver
 
 # components
 from utils.tools import get_weather, calculator
@@ -41,9 +43,10 @@ model = ChatGoogleGenerativeAI(
 agent_executor = create_agent(
     model,
     tools=[calculator, get_weather],
+    checkpointer=InMemorySaver(),
     system_prompt=SystemMessage(content="You are a helpful assistant with access to tools. "
-                                         "Use the calculator for math operations and get_weather for weather information. "
-                                         "Don't go beyond the scope of available tools.")
+                                        "Use the calculator for math operations and get_weather for weather information. "
+                                        "Don't go beyond the scope of available tools.")
 )
 
 
@@ -60,7 +63,10 @@ class AgentResponse(BaseModel):
 @app.post("/agent", response_model=AgentResponse)
 def agent_endpoint(request: QueryRequest):
     try:
-        state = agent_executor.invoke({"messages": [{"role": "user", "content": request.query}]})
+        state = agent_executor.invoke(
+            {"messages": [{"role": "user", "content": request.query}]},
+            {"configurable": {"thread_id": str(uuid4())}},
+        )
 
         messages = state.get("messages", [])
         answer = extract_text_from_message(messages[-1]) if messages else ""

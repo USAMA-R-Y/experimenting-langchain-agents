@@ -1,5 +1,12 @@
+import os
 from typing import List
+import httpx
+
+# libs
+from dotenv import load_dotenv
 from langchain_core.tools import tool
+
+load_dotenv()
 
 # ==================== TOOLS ====================
 
@@ -40,18 +47,70 @@ def advanced_calculator(expression: str) -> dict:
 # Weather Tools
 @tool
 def get_weather(city: str) -> dict:
-    """Gets current weather for a city
+    """Fetches the weather details for a city via WeatherAPI.
 
     Args:
         city: City name
     """
-    weather_db = {
-        "london": {"temp": 15, "condition": "Rainy", "humidity": 80},
-        "paris": {"temp": 18, "condition": "Sunny", "humidity": 60},
-        "new york": {"temp": 22, "condition": "Cloudy", "humidity": 70},
-        "tokyo": {"temp": 25, "condition": "Clear", "humidity": 55}
+    api_key = os.getenv("WEATHER_API_KEY")
+    if not api_key:
+        return {
+            "error": "WEATHER_API_KEY not set",
+            "message": "Create a .env with WEATHER_API_KEY from weatherapi.com",
+        }
+
+    url = "https://api.weatherapi.com/v1/current.json"
+    params = {"q": city, "key": api_key}
+
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            resp = client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        return {
+            "error": "Failed to fetch weather",
+            "details": str(e),
+            "city": city,
+        }
+
+    if "error" in data:
+        return {
+            "error": data["error"].get("message", "Unknown error"),
+            "city": city,
+        }
+
+    location = data.get("location") or {}
+    current = data.get("current") or {}
+    condition = (current.get("condition") or {})
+
+    return {
+        "city": location.get("name"),
+        "region": location.get("region"),
+        "country": location.get("country"),
+        "latitude": location.get("lat"),
+        "longitude": location.get("lon"),
+        "timezone": location.get("tz_id"),
+        "localtime": location.get("localtime"),
+        "temperature_c": current.get("temp_c"),
+        "temperature_f": current.get("temp_f"),
+        "is_day": current.get("is_day"),
+        "condition": {
+            "text": condition.get("text"),
+            "icon": condition.get("icon"),
+            "code": condition.get("code"),
+        },
+        "humidity": current.get("humidity"),
+        "wind_kph": current.get("wind_kph"),
+        "wind_dir": current.get("wind_dir"),
+        "pressure_mb": current.get("pressure_mb"),
+        "precip_mm": current.get("precip_mm"),
+        "cloud": current.get("cloud"),
+        "feelslike_c": current.get("feelslike_c"),
+        "feelslike_f": current.get("feelslike_f"),
+        "uv": current.get("uv"),
+        "raw": data,
     }
-    return weather_db.get(city.lower(), {"temp": 20, "condition": "Unknown", "humidity": 65})
 
 
 @tool
