@@ -83,7 +83,7 @@ def health():
 
 if __name__ == "__main__":
     uvicorn.run(
-        "lg-agent:app",
+        "2_lg_agent:app",
         host="0.0.0.0",
         port=8001,
         reload=True

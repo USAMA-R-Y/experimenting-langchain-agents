@@ -115,20 +115,75 @@ def get_weather(city: str) -> dict:
 
 @tool
 def get_forecast(city: str, days: int) -> dict:
-    """Gets weather forecast for upcoming days
+    """Gets weather forecast via WeatherAPI (1-7 days).
 
     Args:
         city: City name
         days: Number of days (1-7)
     """
-    forecasts = {
-        "london": ["Rainy", "Cloudy", "Sunny", "Rainy", "Cloudy", "Sunny", "Rainy"],
-        "paris": ["Sunny", "Sunny", "Cloudy", "Rainy", "Sunny", "Sunny", "Cloudy"],
-        "new york": ["Cloudy", "Rainy", "Sunny", "Sunny", "Cloudy", "Rainy", "Sunny"],
-        "tokyo": ["Clear", "Clear", "Cloudy", "Rainy", "Clear", "Clear", "Sunny"]
+    api_key = os.getenv("WEATHER_API_KEY")
+    if not api_key:
+        return {
+            "error": "WEATHER_API_KEY not set",
+            "message": "Create a .env with WEATHER_API_KEY from weatherapi.com",
+        }
+
+    days = max(1, min(days, 7))
+
+    url = "https://api.weatherapi.com/v1/forecast.json"
+    params = {"q": city, "days": days, "key": api_key}
+
+    try:
+        with httpx.Client(timeout=8.0) as client:
+            resp = client.get(url, params=params)
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as e:
+        return {
+            "error": "Failed to fetch forecast",
+            "details": str(e),
+            "city": city,
+        }
+
+    if "error" in data:
+        return {
+            "error": data["error"].get("message", "Unknown error"),
+            "city": city,
+        }
+
+    location = data.get("location") or {}
+    forecast = data.get("forecast", {}).get("forecastday", [])
+
+    parsed_days = []
+    for day in forecast:
+        day_info = day.get("day") or {}
+        condition = (day_info.get("condition") or {})
+        parsed_days.append({
+            "date": day.get("date"),
+            "max_temp_c": day_info.get("maxtemp_c"),
+            "min_temp_c": day_info.get("mintemp_c"),
+            "avg_temp_c": day_info.get("avgtemp_c"),
+            "max_wind_kph": day_info.get("maxwind_kph"),
+            "total_precip_mm": day_info.get("totalprecip_mm"),
+            "avg_humidity": day_info.get("avghumidity"),
+            "chance_of_rain": day_info.get("daily_chance_of_rain"),
+            "chance_of_snow": day_info.get("daily_chance_of_snow"),
+            "condition": {
+                "text": condition.get("text"),
+                "icon": condition.get("icon"),
+                "code": condition.get("code"),
+            },
+        })
+
+    return {
+        "city": location.get("name"),
+        "country": location.get("country"),
+        "latitude": location.get("lat"),
+        "longitude": location.get("lon"),
+        "timezone": location.get("tz_id"),
+        "forecast_days": parsed_days,
+        "raw": data,
     }
-    city_forecast = forecasts.get(city.lower(), ["Unknown"] * 7)
-    return {"city": city, "forecast": city_forecast[:days]}
 
 
 # Data Analysis Tools
