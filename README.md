@@ -4,21 +4,23 @@ A comprehensive learning project exploring agentic AI implementations using Goog
 
 ## 🎯 Project Overview
 
-This repository demonstrates four progressive approaches to building AI agents with tool-calling capabilities:
+This repository demonstrates five progressive approaches to building AI agents with tool-calling capabilities:
 
 1. **Basic Agent** - Direct Gemini SDK implementation (no LangChain)
 2. **LangChain Agent** - Single agent with LangChain abstractions
 3. **Multi-Agent Sync** - Sequential pipeline where each tool depends on previous outputs
 4. **Multi-Agent Async** - Parallel execution for high-throughput support ticket processing
+5. **LangGraph Agent** - Explicit graph-based architecture with state management
 
 ## 📁 Project Structure
 
 ```
 lg-tools/
 ├── 1_basic_agent.py              # Native Gemini SDK implementation
-├── 2_lg-agent.py                 # Simple LangChain agent
+├── 2_lg_agent.py                 # Simple LangChain agent
 ├── 3_lg_multi_agent_sync.py      # Sequential pipeline with dependencies
 ├── 4_lg_multi_agent_async.py     # Parallel async execution
+├── 5_lgraph_agent.py             # LangGraph with explicit state graph
 ├── requirements.txt              # Python dependencies
 ├── .env                          # Environment variables (create this)
 └── utils/
@@ -184,7 +186,7 @@ curl -X POST http://localhost:8000/agent \
 
 **Run:**
 ```bash
-python 2_lg-agent.py
+python 2_lg_agent.py
 # Server runs at http://0.0.0.0:8001
 ```
 
@@ -205,7 +207,101 @@ curl -X POST http://localhost:8001/agent \
 
 ---
 
-### Option 3: Multi-Agent Synchronous (Sequential Pipeline with Dependencies)
+### Option 3: LangGraph Agent (Graph-Based Architecture)
+
+**Features:**
+- **Explicit Graph Structure** - Uses StateGraph for visual and maintainable architecture
+- **State Management** - TypedDict-based state flows through nodes
+- **ReAct Loop** - Implements Reasoning-Action-Observation cycle
+- **Conditional Routing** - Dynamic edge selection based on LLM output
+- **Memory Checkpointing** - Conversation state persistence
+- **Node-Based Design** - Separate nodes for agent and tool execution
+
+**Graph Architecture:**
+```
+    START
+      ↓
+  ┌─────────┐
+  │  agent  │  (LLM decides on action)
+  └────┬────┘
+       ↓
+  [should_continue?]
+       ↓           ↓
+  ┌─────────┐   END
+  │  tools  │
+  └────┬────┘
+       ↓
+   (loop back to agent)
+```
+
+**Key Components:**
+1. **AgentState** - TypedDict defining conversation state with message history
+2. **call_model** - Node that invokes LLM with tool binding
+3. **should_continue** - Conditional edge that routes to tools or END
+4. **ToolNode** - Pre-built node for executing tool calls
+5. **MemorySaver** - Checkpointer for conversation continuity
+
+**Run:**
+```bash
+python 5_lgraph_agent.py
+# Server runs at http://0.0.0.0:8003
+```
+
+**Endpoints:**
+- `POST /agent` - Send query to graph-based agent
+- `GET /health` - Health check with graph info
+- `GET /graph-info` - Detailed graph structure and node information
+- `GET /` - API documentation and example queries
+
+**Request Schema:**
+```json
+{
+  "query": "What is 25 multiplied by 8?"
+}
+```
+
+**Example Request:**
+```bash
+curl -X POST http://localhost:8003/agent \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Calculate 2^10 and tell me the weather in Paris"}'
+```
+
+**Response Format:**
+```json
+{
+  "answer": "2^10 equals 1024. The weather in Paris is currently...",
+  "intermediate_steps": null,
+  "graph_steps": 5
+}
+```
+
+**Graph Information Endpoint:**
+```bash
+curl http://localhost:8003/graph-info
+```
+
+**Use Cases:**
+- Learning graph-based agent architecture
+- When you need explicit control over agent flow
+- Complex workflows with custom routing logic
+- Debugging and visualizing agent behavior
+- Building multi-step reasoning systems
+
+**Advantages over Simple LangChain Agent:**
+
+| Aspect | LangChain Agent (2) | LangGraph Agent (5) |
+|--------|---------------------|---------------------|
+| **Architecture** | Abstracted | Explicit graph structure |
+| **Customization** | Limited | Full control over nodes/edges |
+| **Debugging** | Harder to trace | Clear node-by-node flow |
+| **Flexibility** | Fixed pattern | Custom routing logic |
+| **Learning Curve** | Easier | Steeper but more powerful |
+| **Use Case** | Quick prototypes | Production systems |
+
+---
+
+### Option 4: Multi-Agent Synchronous (Sequential Pipeline with Dependencies)
 
 **Features:**
 - **6-Step Sequential Pipeline** - Each tool depends on previous tool outputs
@@ -281,7 +377,7 @@ curl -X POST http://localhost:8001/support/process \
 
 ---
 
-### Option 4: Multi-Agent Async (Parallel Execution)
+### Option 5: Multi-Agent Async (Parallel Execution)
 
 **Features:**
 - **5 Specialized Agents** running in **parallel** (no dependencies)
@@ -389,6 +485,41 @@ User Query → Gemini Model → Function Call Decision → Tool Execution → Fi
 User Query → LangChain Agent → Tool Selection → Tool Execution → Response Formatting
 ```
 
+### LangGraph Agent Flow (Explicit Graph)
+```
+User Query 
+    ↓
+Initialize State
+    ↓
+┌─────────────────────────────────────────────────┐
+│  Agent Node (call_model)                        │
+│  - Receives state with messages                 │
+│  - LLM analyzes and decides action              │
+│  - Returns updated state                        │
+└────────────────┬────────────────────────────────┘
+                 ↓
+       [Conditional Edge: should_continue?]
+                 ↓
+        ┌────────┴────────┐
+        ↓                 ↓
+┌──────────────┐    ┌─────────┐
+│  Tool Node   │    │   END   │
+│  - Execute   │    │ (Final  │
+│    tools     │    │ Answer) │
+│  - Update    │    └─────────┘
+│    state     │
+└──────┬───────┘
+       ↓
+   (Loop back to Agent Node)
+```
+
+**Key LangGraph Concepts:**
+- **State**: TypedDict that flows through nodes
+- **Nodes**: Functions that read/write state
+- **Edges**: Connections between nodes (conditional or fixed)
+- **Checkpointing**: Save/restore conversation state
+
+
 ### Multi-Agent Synchronous Flow (Sequential Pipeline)
 ```
 Support Ticket
@@ -458,8 +589,8 @@ Async Orchestrator
                     │  Response Generator   │
                     │  (synthesizes all)    │
                     └───────────┬───────────┘
-                                ↓
-                         Final Response
+    ↓
+Final Response
 ```
 
 **Key Characteristic:** All agents run SIMULTANEOUSLY with NO dependencies. Results are aggregated at the end.
@@ -473,6 +604,12 @@ Async Orchestrator
 ### LangChain Agent (Port 8001)
 - `POST /agent` - Process query with LangChain agent
 - `GET /health` - Health check
+
+### LangGraph Agent (Port 8003)
+- `POST /agent` - Process query through graph-based agent
+- `GET /health` - Health check with graph info
+- `GET /graph-info` - Detailed graph structure information
+- `GET /` - API documentation
 
 ### Sync Multi-Agent (Port 8001)
 - `POST /support/process` - Process support ticket through sequential pipeline
@@ -550,6 +687,22 @@ response = requests.post(
 print(response.json())
 ```
 
+**LangGraph Agent:**
+```python
+import requests
+
+# Query the graph-based agent
+response = requests.post(
+    "http://localhost:8003/agent",
+    json={"query": "Calculate 2^10 and tell me the weather in Tokyo"}
+)
+print(response.json())
+
+# Get graph structure information
+graph_info = requests.get("http://localhost:8003/graph-info")
+print(graph_info.json())
+```
+
 **Sync Multi-Agent (Sequential Pipeline):**
 ```python
 import requests
@@ -581,6 +734,25 @@ print(response.json())
 ```
 
 ### cURL Examples
+
+**LangGraph Agent:**
+```bash
+# Single tool query
+curl -X POST http://localhost:8003/agent \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is 144 divided by 12?"}'
+
+# Multi-tool query
+curl -X POST http://localhost:8003/agent \
+  -H "Content-Type: application/json" \
+  -d '{"query": "Calculate 25 * 8 and then tell me the weather in London"}'
+
+# Get graph information
+curl http://localhost:8003/graph-info
+
+# Get API documentation
+curl http://localhost:8003/
+```
 
 **Sync Multi-Agent:**
 ```bash
@@ -656,24 +828,107 @@ curl http://localhost:8001/
 - Structured output with Pydantic models
 - `invoke()` vs `ainvoke()` - Sync vs async execution
 
-### 4. Dependency Patterns
+### 4. LangGraph Architecture
+- **StateGraph** - Graph-based workflow builder
+- **TypedDict State** - Strongly-typed state definition
+- **Nodes** - Functions that process state
+- **Edges** - Connections between nodes (fixed or conditional)
+- **Conditional Routing** - Dynamic path selection based on state
+- **Checkpointing** - Save/restore conversation state
+- **ToolNode** - Pre-built node for tool execution
+- **add_messages** - Reducer for accumulating message history
+
+### 5. Dependency Patterns
 - **Sequential Dependencies**: Each tool depends on previous tool's output
 - **Independent Tools**: Tools can run in parallel with no dependencies
 - **Context Accumulation**: Building up information through pipeline stages
 - **Result Aggregation**: Combining parallel results into final output
 
-### 5. Async Patterns
+### 6. Async Patterns
 - `asyncio.gather()` - Parallel execution of multiple async tasks
 - `return_exceptions=True` - Graceful error handling
 - `async/await` syntax for non-blocking operations
 - Latency optimization through parallelization
 
-### 6. Production Considerations
+### 7. Production Considerations
 - Environment-based configuration
 - Error handling and validation
 - FastAPI for production-ready APIs
 - Modular code organization (utils/)
 - Performance optimization (sync vs async)
+
+## 🎯 When to Use LangChain vs LangGraph
+
+### Use LangChain Agent (2_lg_agent.py) When:
+
+✅ **Quick Prototyping**
+- Need to build an agent quickly
+- Simple use case with standard patterns
+- Don't need custom routing logic
+
+✅ **Learning Basics**
+- Just getting started with agents
+- Want to understand core concepts first
+- Prefer abstraction over explicit control
+
+✅ **Standard Workflows**
+- Simple question-answering with tools
+- No complex branching logic needed
+- Standard ReAct pattern is sufficient
+
+✅ **Use Cases:**
+- MVPs and demos
+- Simple chatbots
+- Straightforward tool-calling scenarios
+- Learning projects
+
+### Use LangGraph Agent (5_lgraph_agent.py) When:
+
+✅ **Custom Control Required**
+- Need explicit control over agent flow
+- Want to customize routing logic
+- Building complex multi-step workflows
+
+✅ **Production Systems**
+- Need to debug and monitor agent behavior
+- Want to visualize agent flow
+- Require detailed logging at each step
+
+✅ **Complex Workflows**
+- Multiple decision points
+- Custom conditional logic
+- Need to implement specific patterns beyond ReAct
+
+✅ **Use Cases:**
+- Production applications
+- Complex decision trees
+- Custom agent architectures
+- Systems requiring auditability
+- Multi-agent coordination
+
+### Comparison: LangChain vs LangGraph
+
+| Aspect | LangChain Agent | LangGraph Agent |
+|--------|----------------|-----------------|
+| **Setup Complexity** | Simple (`create_agent()`) | More complex (graph building) |
+| **Control** | Limited | Full control |
+| **Debugging** | Harder | Easier (node-by-node) |
+| **Customization** | Fixed patterns | Highly customizable |
+| **Learning Curve** | Gentle | Steeper |
+| **Visualization** | Not built-in | Can visualize graph |
+| **Best For** | Prototypes | Production |
+| **Code Lines** | ~50 lines | ~200 lines |
+| **Flexibility** | Medium | High |
+
+### Quick Decision Guide
+
+```
+Do you need custom routing or complex flow control?
+    ├─ YES → Use LangGraph (Full control)
+    └─ NO → Is this a prototype or production?
+              ├─ Prototype → Use LangChain (Fast)
+              └─ Production → Consider LangGraph (Maintainable)
+```
 
 ## 🎯 When to Use Sync vs Async
 
@@ -776,20 +1031,27 @@ lsof -ti:8000 | xargs kill -9  # Kill process on port 8000
    - Learn request/response parsing
    - No abstractions - see how it really works
 
-2. **Move to `2_lg-agent.py`**
+2. **Move to `2_lg_agent.py`**
    - LangChain abstractions
    - Simplified agent creation with `create_agent()`
    - Message-based workflows
    - Single agent with multiple tools
 
-3. **Explore `3_lg_multi_agent_sync.py`**
+3. **Explore `5_lgraph_agent.py`**
+   - Explicit graph-based architecture
+   - StateGraph with nodes and edges
+   - Conditional routing logic
+   - ReAct reasoning loop
+   - **Key Learning:** How to build agents with full control over flow
+
+4. **Study `3_lg_multi_agent_sync.py`**
    - Sequential pipeline architecture
    - Tool dependencies and data flow
    - Context accumulation through stages
    - Orchestrator pattern
    - **Key Learning:** How to chain tools where each depends on previous output
 
-4. **Master `4_lg_multi_agent_async.py`**
+5. **Master `4_lg_multi_agent_async.py`**
    - Parallel execution patterns
    - Async/await syntax
    - `asyncio.gather()` for concurrency
@@ -799,14 +1061,38 @@ lsof -ti:8000 | xargs kill -9  # Kill process on port 8000
 
 **Recommended Order:**
 ```
-Basic → LangChain → Sync Multi-Agent → Async Multi-Agent
- (1)      (2)            (3)                  (4)
+Basic → LangChain → LangGraph → Sync Multi-Agent → Async Multi-Agent
+ (1)      (2)         (5)            (3)                  (4)
 ```
 
 **What You'll Learn at Each Stage:**
 - **Stage 1-2:** Foundation of agents and tools
-- **Stage 3:** Sequential reasoning and dependency management
-- **Stage 4:** Performance optimization and production patterns
+- **Stage 3:** Graph-based architecture and state management
+- **Stage 4:** Sequential reasoning and dependency management
+- **Stage 5:** Performance optimization and production patterns
+
+**Alternative Learning Paths:**
+
+**For Beginners:**
+```
+1 (Basic) → 2 (LangChain) → 5 (LangGraph)
+↓
+Stop here or continue to multi-agent systems
+```
+
+**For Production Engineers:**
+```
+2 (LangChain) → 5 (LangGraph) → 4 (Async Multi-Agent)
+↓
+Focus on scalability and performance
+```
+
+**For Researchers:**
+```
+1 (Basic) → 5 (LangGraph) → 3 (Sync Multi-Agent)
+↓
+Focus on architecture and reasoning patterns
+```
 
 ## 🔗 Resources
 
