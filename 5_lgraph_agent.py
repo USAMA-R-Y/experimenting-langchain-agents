@@ -1,23 +1,20 @@
 import os
 import operator
 from uuid import uuid4
+import json
 import uvicorn
 from dotenv import load_dotenv
-from typing import TypedDict, Annotated, Sequence, Optional, Literal
+from typing import TypedDict, Annotated, Optional, Literal
 
 # libs
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from langchain.messages import AnyMessage
+from langchain_core.messages import AnyMessage
 
 # langchain & langgraph
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import SystemMessage, BaseMessage, HumanMessage, AIMessage, ToolMessage
-from langchain_core.tools import BaseTool
+from langchain_core.messages import SystemMessage, HumanMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.memory import MemorySaver
 
 # components
 from utils.tools import get_weather, calculator
@@ -58,11 +55,6 @@ tools_by_name = {tool.name: tool for tool in tools}
 model_with_tools = model.bind_tools(tools)
 
 
-class MessagesState(TypedDict):
-    messages: Annotated[list[AnyMessage], operator.add]
-    llm_calls: int
-
-
 # ==================== NODE FUNCTIONS ====================
 def llm_call(state: dict):
     """LLM decides whether to call a tool or not"""
@@ -72,13 +64,17 @@ def llm_call(state: dict):
             model_with_tools.invoke(
                 [
                     SystemMessage(
-                        content="You are a helpful assistant tasked with performing arithmetic on a set of inputs."
+                        content=(
+                            "You are a helpful assistant with access to tools. "
+                            "Use the calculator for math operations and get_weather for weather information. "
+                            "Only call tools when needed."
+                        )
                     )
                 ]
                 + state["messages"]
             )
         ],
-        "llm_calls": state.get('llm_calls', 0) + 1
+        "llm_calls": state.get("llm_calls", 0) + 1
     }
 
 
@@ -89,7 +85,12 @@ def tool_node(state: dict):
     for tool_call in state["messages"][-1].tool_calls:
         tool = tools_by_name[tool_call["name"]]
         observation = tool.invoke(tool_call["args"])
-        result.append(ToolMessage(content=observation, tool_call_id=tool_call["id"]))
+        result.append(
+            ToolMessage(
+                content=json.dumps(observation) if not isinstance(observation, str) else observation,
+                tool_call_id=tool_call["id"],
+            )
+        )
     return {"messages": result}
 
 
@@ -178,7 +179,8 @@ def agent_endpoint(request: QueryRequest):
     try:
         # Create initial state with user message
         initial_state = {
-            "messages": [HumanMessage(content=request.query)]
+            "messages": [HumanMessage(content=request.query)],
+            "llm_calls": 0,
         }
 
         # Run the graph with a unique thread ID for conversation tracking
@@ -209,7 +211,7 @@ def health():
     return {
         "status": "ok",
         "agent_type": "langgraph",
-        "graph_nodes": ["agent", "tools"],
+        "graph_nodes": ["llm_call", "tool_node"],
         "description": "LangGraph agent with explicit state graph"
     }
 
